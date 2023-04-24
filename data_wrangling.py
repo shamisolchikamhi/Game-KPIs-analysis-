@@ -8,6 +8,16 @@ class DataCleaning:
         self.data = data
         self.columns = columns
 
+    def id_columns_to_object(self):
+        for col in self.data.columns:
+            if 'id' in col:
+                self.data[col] = self.data[col].astype('object')
+
+    def date_column_type(self):
+        for col in self.data.columns:
+            if 'date' in col:
+                self.data[col] = pd.to_datetime(self.data[col])
+
     def check_duplicates(self):
         # Check for duplicates
         num_duplicates = self.data.duplicated().sum()
@@ -40,7 +50,7 @@ class DataCleaning:
         outliers = {}
 
         for col in self.columns:
-            if self.data[col].dtype in ['int64', 'float64'] and 'id' not in col.lower():
+            if self.data[col].dtype in ['int64', 'float64']:
                 # Calculate the interquartile range (IQR)
                 q1 = self.data[col].quantile(0.25)
                 q3 = self.data[col].quantile(0.75)
@@ -58,62 +68,53 @@ class DataCleaning:
 
         return outliers
 
-class DataAnalytics:
-    def __init__(self, adspend_df, installs_df, payouts_df, revenue_df):
-        self.adspend_df = adspend_df
-        self.installs_df = installs_df
-        self.payouts_df = payouts_df
-        self.revenue_df = revenue_df
+# New column
+# feature_engineering
+def break_down_date(df):
+    for col in df.columns:
+        if 'date' in col:
+            df['year'] = df[col].dt.year
+            df['month'] = df[col].dt.month
+            df['year and month'] = df[col].dt.to_period('M').dt.to_timestamp()
+            df['day_of_week'] = df[col].dt.day_name()
 
-    def user_acquisition_costs(self, groupby_column = 'network_id'):
-        # Aggregate adspend data by network_id
-        adspend_per_network = self.adspend_df.groupby(['network_id', 'country_id', 'event_date'])['value_usd'].sum()
+    return df
 
-        # Merge with installs data on network_id
-        installs_per_network = self.installs_df.groupby(['network_id', 'country_id', 'event_date'])[
-            'install_id'].count().reset_index()
-        installs_with_adspend = pd.merge(installs_per_network, adspend_per_network,
-                                         on=['network_id', 'country_id', 'event_date'], how = 'left')
-        installs_with_adspend.fillna(0, inplace=True)
+# import adata
 
-        # Calculate user acquisition cost per network
-        installs_with_adspend['user_acquisition_cost_usd'] = installs_with_adspend['value_usd'] / \
-                                                             installs_with_adspend['install_id']
+adspend_df = pd.read_csv('adspend.csv')
+installs_df = pd.read_csv('installs.csv')
+payouts_df = pd.read_csv('payouts.csv')
+revenue_df = pd.read_csv('revenue.csv')
 
-        # Aggregate user acquisition cost by network
-        user_acquisition_costs_per_network = installs_with_adspend.groupby(groupby_column)[
-            'user_acquisition_cost_usd'].mean().reset_index()
+adspend = DataCleaning(data = adspend_df,columns=list(adspend_df.columns))
+adspend.id_columns_to_object()
+adspend.date_column_type()
+# adspend.check_duplicates()
+adspend.fill_missing_values()
+adspend.check_for_outliers()
+adspend_df = break_down_date(adspend.data)
 
-        return user_acquisition_costs_per_network
-    def revenue_generated_per_install(self, groupby_column= 'install_id'):
-        # Merge revenue and installs data on install_id
-        agregated_revenue = self.revenue_df.groupby(['install_id', 'event_date'])['value_usd'].sum().reset_index()
-        revenue_with_installs = pd.merge(agregated_revenue, self.installs_df, on='install_id')
-        revenue_with_installs = revenue_with_installs.rename(columns = {'value_usd':'revenue_per_install_usd'})
+installs = DataCleaning(data = installs_df, columns= list(installs_df.columns))
+installs.id_columns_to_object()
+installs.date_column_type()
+# installs.check_duplicates()
+installs.fill_missing_values()
+installs.check_for_outliers()
+installs_df = break_down_date(installs.data)
 
-        # Aggregate revenue per user by country
-        revenue_generated_per_user = revenue_with_installs.groupby(groupby_column)['revenue_per_install_usd'].mean().reset_index()
+payouts = DataCleaning(data = payouts_df, columns = list(payouts_df.columns))
+payouts.id_columns_to_object()
+payouts.date_column_type()
+# payouts.check_duplicates()
+payouts.fill_missing_values()
+payouts.check_for_outliers()
+payouts_df = break_down_date(payouts.data)
 
-        return revenue_generated_per_user
-
-    def total_payouts_made_per_install(self, groupby_column= 'install_id'):
-        # Aggregate payouts data by install_id
-        payouts_per_install = self.payouts_df.groupby(groupby_column)['value_usd'].sum()
-
-        return payouts_per_install
-
-    # def user_retention_rate(self):
-    #     # Calculate the number of users who installed the app on day 0
-    #     users_day_0 = self.installs_df[self.installs_df['event_date'] == self.installs_df['event_date'].min()][
-    #         'install_id'].unique()
-    #
-    #     # Calculate the number of users who returned on day 1
-    #     users_day_1 = \
-    #     self.installs_df[self.installs_df['event_date'] == self.installs_df['event_date'].min() + pd.Timedelta(days=1)][
-    #         'install_id'].unique()
-    #
-    #     # Calculate user retention rate from day 0 to day 1
-    #     user_retention_rate = len(set(users_day_0) & set(users_day_1)) / len(users_day_0)
-    #
-    #     return user_retention_rate
-
+revenue = DataCleaning(data= revenue_df, columns = list(revenue_df.columns))
+revenue.id_columns_to_object()
+revenue.date_column_type()
+# revenue.check_duplicates()
+revenue.fill_missing_values()
+revenue.check_for_outliers()
+revenue_df = break_down_date(revenue.data)
