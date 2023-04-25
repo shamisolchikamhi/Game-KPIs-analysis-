@@ -71,50 +71,9 @@ class DataCleaning:
 # New column
 # feature_engineering
 def break_down_date(df):
-    for col in df.columns:
-        if 'date' in col:
-            df['year'] = df[col].dt.year
-            df['month'] = df[col].dt.month
-            df['year and month'] = df[col].dt.to_period('M').dt.to_timestamp()
-            df['day_of_week'] = df[col].dt.day_name()
+    df['year'] = df['event_date'].dt.year
+    df['month'] = df['event_date'].dt.month
+    df['year and month'] = df['event_date'].dt.to_period('M').dt.to_timestamp()
+    df['day_of_week'] = df['event_date'].dt.day_name()
 
     return df
-
-# import adata
-
-adspend_df = pd.read_csv('adspend.csv')
-installs_df = pd.read_csv('installs.csv')
-payouts_df = pd.read_csv('payouts.csv')
-revenue_df = pd.read_csv('revenue.csv')
-
-adspend = DataCleaning(data = adspend_df,columns=list(adspend_df.columns))
-adspend.id_columns_to_object()
-adspend.date_column_type()
-# adspend.check_duplicates()
-adspend.fill_missing_values()
-adspend.check_for_outliers()
-adspend_df = break_down_date(adspend.data)
-
-installs = DataCleaning(data = installs_df, columns= list(installs_df.columns))
-installs.id_columns_to_object()
-installs.date_column_type()
-# installs.check_duplicates()
-installs.fill_missing_values()
-installs.check_for_outliers()
-installs_df = break_down_date(installs.data)
-
-payouts = DataCleaning(data = payouts_df, columns = list(payouts_df.columns))
-payouts.id_columns_to_object()
-payouts.date_column_type()
-# payouts.check_duplicates()
-payouts.fill_missing_values()
-payouts.check_for_outliers()
-payouts_df = break_down_date(payouts.data)
-
-revenue = DataCleaning(data= revenue_df, columns = list(revenue_df.columns))
-revenue.id_columns_to_object()
-revenue.date_column_type()
-# revenue.check_duplicates()
-revenue.fill_missing_values()
-revenue.check_for_outliers()
-revenue_df = break_down_date(revenue.data)
