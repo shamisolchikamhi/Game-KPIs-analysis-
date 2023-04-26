@@ -23,6 +23,7 @@ class KpiAnalytics:
         # Calculate user acquisition cost per network
         installs_with_adspend['user_acquisition_cost_usd'] = installs_with_adspend['value_usd'] / \
                                                              installs_with_adspend['install_id']
+        installs_with_adspend = DataCleaning.break_down_date(installs_with_adspend)
 
         # Aggregate user acquisition cost by network
         if mean:
@@ -43,7 +44,7 @@ class KpiAnalytics:
     def revenue_generated_per_install(self, groupby_column= 'install_id', mean = True):
         # Merge revenue and installs data on install_id
         agregated_revenue = self.revenue_df.groupby(['install_id', 'event_date'])['value_usd'].sum().reset_index()
-        revenue_with_installs = pd.merge(agregated_revenue, self.installs_df, on='install_id')
+        revenue_with_installs = pd.merge(agregated_revenue, self.installs_df, on=['install_id', 'event_date'], how = 'outer')
         revenue_with_installs = revenue_with_installs.rename(columns = {'value_usd':'revenue_per_install_usd'})
 
         # Aggregate revenue per user by country
@@ -61,8 +62,8 @@ class KpiAnalytics:
         # payouts_per_install = self.payouts_df.groupby(groupby_column)['value_usd'].sum()
 
         # Merge revenue and installs data on install_id
-        agregated_payouts = self.revenue_df.groupby(['install_id', 'event_date'])['value_usd'].sum().reset_index()
-        payouts_with_installs = pd.merge(agregated_payouts, self.installs_df, on='install_id')
+        agregated_payouts = self.payouts_df.groupby(['install_id', 'event_date'])['value_usd'].sum().reset_index()
+        payouts_with_installs = pd.merge(agregated_payouts, self.installs_df, on=['install_id', 'event_date'], how = 'outer')
         payouts_with_installs = payouts_with_installs.rename(columns={'value_usd': 'payouts_per_install_usd'})
 
         # Aggregate revenue per user by country
@@ -75,7 +76,7 @@ class KpiAnalytics:
 
         return payouts_per_install
 
-    def user_retention_rate(self, groupby_column= 'network_id', days_active = False, retention_rate = True):
+    def user_retention_rate(self, groupby_column= 'network_id', days_active = False):
         # Calculate the number of users who installed the app on day 0
 
         payouts_df = self.payouts_df.groupby(['install_id', 'year and month'])['event_date'].max().reset_index()
@@ -101,38 +102,46 @@ class KpiAnalytics:
 
         return df
 
-# class Profit(KpiAnalytics):
     def total_profit(self):
         # Get user acquisition costs
-        cols = ['network_id', 'country_id', '']
+        cols = ['network_id', 'country_id', 'event_date']
         user_acquisition_costs = self.user_acquisition_costs(groupby_column=cols, mean=False)
-        # user_acquisition_costs = user_acquisition_costs.rename(columns= {'value_usd':''})
-
         # Get revenue generated per install
         revenue_generated_per_install = self.revenue_generated_per_install(groupby_column=cols, mean=False)
-
         # Get total payouts made per install
         total_payouts_made_per_install = self.total_payouts_made_per_install(groupby_column=cols, mean=False)
-
         # Get user retention rate
-        user_retention_rate = self.user_retention_rate(groupby_column=cols+['install_year and month'])
+        cols_ret = ['network_id', 'country_id', 'install_date']
+        user_retention_days_active = self.user_retention_rate(groupby_column=cols_ret)
+        user_retention_days_active = user_retention_days_active.rename(columns={'install_date': 'event_date'})
+        user_retention_rate = self.user_retention_rate(groupby_column=cols_ret, days_active=True)
+        user_retention_rate = user_retention_rate.rename(columns={'install_date': 'event_date'})
 
         # Merge data frames
         df = pd.merge(user_acquisition_costs, revenue_generated_per_install, on=cols, how='left')
         df = pd.merge(df, total_payouts_made_per_install, on=cols, how='left')
         df = pd.merge(df, user_retention_rate, on=cols, how='left')
+        df = pd.merge(df, user_retention_days_active, on=cols)
 
         # Calculate profit
-        df['profit_usd'] = df['revenue_per_install_usd'] - df['payouts_per_install_usd'] - df['user_acquisition_cost_usd']
-
-        # # Select relevant columns
-        # df = df[['network_id', 'country_id', 'install_year and month', 'total_users', 'retained_users', 'retention_rate',
-        #          'value_usd_x', 'value_usd_y', 'value_usd', 'profit_usd']]
-        #
+        df['profit_usd'] = df['revenue_per_install_usd'] - df['payouts_per_install_usd'] - df[
+            'user_acquisition_cost_usd']
         # # Rename columns
-        # df = df.rename(columns={'value_usd_x': 'total_ad_spend_usd', 'value_usd_y': 'total_revenue_usd',
-        #                         'value_usd': 'total_payouts_usd'})
+        df = df.rename(columns={'revenue_per_install_usd': 'revenue', 'payouts_per_install_usd': 'payouts'})
+        df = DataCleaning.break_down_date(df)
 
         return df
+
+    def grouped_profit(self, groupby_column, mean = True):
+        df = self.total_profit()
+        if mean:
+            df = df.groupby(groupby_column)[
+                'profit_usd'].mean().reset_index()
+        else:
+            df = df.groupby(groupby_column)[
+                'profit_usd'].sum().reset_index()
+
+        return df
+
 
 

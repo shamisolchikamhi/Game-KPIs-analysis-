@@ -67,13 +67,11 @@ class DataCleaning:
                     self.data = self.data[(self.data[col] >= lower_bound) & (self.data[col] <= upper_bound)]
 
         return outliers
+    @staticmethod
+    def break_down_date(df):
+        df['year'] = df['event_date'].dt.year
+        df['month'] = df['event_date'].dt.month
+        df['year and month'] = df['event_date'].dt.to_period('M').dt.to_timestamp()
+        df['day_of_week'] = df['event_date'].dt.day_name()
 
-# New column
-# feature_engineering
-def break_down_date(df):
-    df['year'] = df['event_date'].dt.year
-    df['month'] = df['event_date'].dt.month
-    df['year and month'] = df['event_date'].dt.to_period('M').dt.to_timestamp()
-    df['day_of_week'] = df['event_date'].dt.day_name()
-
-    return df
+        return df
